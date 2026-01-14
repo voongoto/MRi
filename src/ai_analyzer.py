@@ -136,9 +136,8 @@ def analyze_series_ai(series_path: str, sample: int = 1, prompt: str = ""):
             ],
             # Optimized for clinical accuracy
             "temperature": 0.1,
-            "max_tokens": 8192,  # Explicit limit to avoid truncation (-1 may not work)
-            "top_p": 0.95,
-            "repeat_penalty": 1.1,
+            "max_tokens": -1,
+            "stream": False
         }
         
         try:
@@ -242,11 +241,8 @@ CRITICAL: Analyze ONLY what you see in THIS specific image. Do not repeat observ
             ],
             # Optimized for clinical accuracy with anti-repetition
             "temperature": 0.2,          # Slightly higher for variety
-            "max_tokens": 8192,            # Explicit limit to avoid truncation
-            "top_p": 0.9,                
-            "repeat_penalty": 1.3,       # Stronger penalty for repetition
-            "presence_penalty": 0.5,     # Discourage repeating tokens
-            "frequency_penalty": 0.3,    # Reduce frequent phrases
+            "max_tokens": -1,            # Use max available context
+            "stream": False
         }
         
         try:

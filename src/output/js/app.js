@@ -80,10 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
         seqIcon: document.getElementById('seq-icon'),
         seqName: document.getElementById('seq-name'),
         seqDesc: document.getElementById('seq-desc'),
-        // Ruler
-        rulerContainer: document.getElementById('ruler-container'),
-        rulerScale: document.getElementById('ruler-scale'),
-        rulerLabel: document.getElementById('ruler-label'),
+
         // AI Analysis
         btnAiAnalyze: document.getElementById('btn-ai-analyze'),
         aiSettingsModal: document.getElementById('ai-settings-modal'),
@@ -667,33 +664,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // ===== RULER =====
-    function updateRuler() {
-        if (!els.rulerContainer || !currentSeries) return;
 
-        // Get pixel spacing (mm per pixel in image)
-        // Use MarkerTool calculation or default
-        const imagePixelSpacing = MarkerTool.calculatePixelSpacing();
-
-        // Calculate mm per pixel on SCREEN
-        // screen_mm = image_mm / zoom
-        const screenPixelSpacing = imagePixelSpacing / currentZoom;
-
-        // Target: Fixed 10 cm = 100 mm
-        const targetPhysicalMm = 100;
-
-        // Calculate exact screen pixels for this physical width
-        const finalScreenPx = targetPhysicalMm / screenPixelSpacing;
-
-        // Update DOM
-        if (els.rulerScale) {
-            els.rulerScale.style.width = `${finalScreenPx}px`;
-        }
-
-        if (els.rulerLabel) {
-            els.rulerLabel.textContent = "10 cm";
-        }
-    }
 
     // Project-Based Initialization
     let currentProject = null;
@@ -1003,7 +974,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 els.zoomLevelDisplay.textContent = `${Math.round(currentZoom * 100)}%`;
             }
             MarkerTool.renderAnnotations();
-            updateRuler();
+
         };
 
         const updateCrosshairPosition = () => {
@@ -1438,7 +1409,7 @@ document.addEventListener('DOMContentLoaded', () => {
             els.mainImage.src = imgPath;
             els.mainImage.onload = () => {
                 MarkerTool.renderAnnotations();
-                updateRuler();
+
                 if (typeof updateContrastInvert === 'function') updateContrastInvert();
             };
             els.mainImage.onerror = () => {

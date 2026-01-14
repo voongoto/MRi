@@ -380,41 +380,7 @@ body {
     margin-top: 2px;
 }
 
-/* Ruler */
-.ruler-container {
-    position: absolute;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    pointer-events: none;
-    z-index: 100;
-}
 
-.ruler-scale {
-    height: 8px;
-    border-bottom: 2px solid white;
-    border-left: 2px solid white;
-    border-right: 2px solid white;
-    margin-bottom: 4px;
-    position: relative;
-    /* Ticks */
-    background-image: linear-gradient(to right, white 2px, transparent 2px);
-    background-size: 20% 100%;
-    /* 5 intervals */
-    background-repeat: repeat-x;
-    background-position: 0 100%;
-}
-
-.ruler-label {
-    color: white;
-    font-family: monospace;
-    font-size: 0.85rem;
-    font-weight: 600;
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
-}
 
 .image-canvas {
     flex: 1;
