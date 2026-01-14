@@ -6,10 +6,8 @@ Patient_*/
 .temp_imports/
 patient-metadata.json
 project-metadata.json
-output/img/
-**/img/
-**/annotations/
-**/imports/
+src/output/img/
+src/output/annotations/
 
 # Python
 __pycache__/

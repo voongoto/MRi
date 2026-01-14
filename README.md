@@ -119,19 +119,13 @@ The Flask backend provides REST endpoints for the patient-centric architecture:
 
 ```
 MRi/
-├── output/                   # Web application files
-│   ├── index.html           # Main HTML page
-│   ├── css/
-│   │   └── style.css        # Viewer styling
-│   ├── js/
-│   │   ├── app.js           # Main application logic
-│   │   ├── data.js          # MRI series metadata
-│   │   └── export.js        # Export functionality
-│   ├── img/                 # Image directories
-│   └── data.json            # Series metadata (JSON format)
-├── process_mri.py           # DICOM processing script
-├── start_viewer.sh          # Server startup script
-└── README.md                # This file
+├── src/                     # Application source code
+│   ├── output/              # Web frontend (HTML/CSS/JS)
+│   ├── mri_server.py        # Backend server
+│   ├── process_mri.py       # processing scripts
+│   └── ...                  # Helper modules
+├── start_viewer.sh          # Launcher script (Run this!)
+└── README.md                # Documentation
 ```
 
 ## Important Notes

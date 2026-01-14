@@ -269,13 +269,18 @@ class ImportManager:
             })
 
             # Call modified process_mri.py
-            process = subprocess.Popen([
-                'python3',
-                'process_mri.py',
+            # Locate script relative to this file
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            script_path = os.path.join(script_dir, 'process_mri.py')
+            
+            cmd = [
+                sys.executable,
+                script_path,
                 '--input', source_path,
                 '--output', import_dir,
                 '--format', 'json'
-            ], stderr=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+            ]
+            process = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
 
             # Read progress from stderr
             for line in iter(process.stderr.readline, ''):

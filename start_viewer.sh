@@ -42,4 +42,4 @@ echo ""
 (sleep 2 && open "http://localhost:8000") &
 
 # Run server
-python3 mri_server.py
+python3 src/mri_server.py

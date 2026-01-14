@@ -16,6 +16,8 @@ from patient_manager import PatientManager
 from ai_analyzer import analyze_series_ai
 
 app = Flask(__name__)
+# Static folder is in the same directory as this script
+static_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'output')
 CORS(app)
 
 # Initialize managers - use current working directory for projects
@@ -426,13 +428,13 @@ def serve_project_image(project_id, file_path):
 @app.route('/')
 def index():
     """Serve main page"""
-    return send_from_directory('output', 'index.html')
+    return send_from_directory(static_folder, 'index.html')
 
 
 @app.route('/<path:path>')
 def static_files(path):
     """Serve static assets"""
-    return send_from_directory('output', path)
+    return send_from_directory(static_folder, path)
 
 
 # ===== ERROR HANDLERS =====
