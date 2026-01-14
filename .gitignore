@@ -1,0 +1,46 @@
+# User projects and patient data (PRIVACY PROTECTION)
+MRIViewerProjects/
+projects/
+Patient_*/
+*_StudyDate_*/
+.temp_imports/
+patient-metadata.json
+project-metadata.json
+output/img/
+**/img/
+**/annotations/
+**/imports/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.env
+.venv
+env/
+venv/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Temporary files
+*.log
+*.tmp
+*.temp
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build artifacts
+*.so
+*.dylib
+dist/
+build/

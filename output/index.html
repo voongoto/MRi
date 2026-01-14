@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MRI Viewer</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-layout">
+        <!-- Top Bar -->
+        <header class="top-bar">
+            <div class="left-nav">
+                <button class="nav-btn">← Back</button>
+                <div class="app-badge">MR</div>
+                <h1 class="app-title">MRI Viewer</h1>
+            </div>
+            <div class="patient-card">
+                <div class="patient-line">
+                    <span class="label">PATIENT</span>
+                    <span class="value" id="header-patient-name">Loading...</span>
+                </div>
+                <div class="patient-line">
+                    <span class="label">MRN</span>
+                    <span class="value blur" id="header-mrn">000-00-0000</span>
+                </div>
+                <div class="status-indicator">
+                    <span class="dot"></span> <span id="header-date">...</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="main-workspace" id="main-workspace">
+            <!-- Left Sidebar: Body Regions -->
+            <aside class="sidebar-left">
+                <div class="sidebar-header">
+                    <button id="toggle-select-mode" class="select-mode-btn" title="Toggle selection mode">☑</button>
+                    <span>BODY REGIONS</span>
+                </div>
+                <div id="region-list" class="region-list">
+                    <!-- Populated by JS -->
+                </div>
+                <div id="export-bar" class="export-bar hidden">
+                    <span id="selected-count">0 selected</span>
+                    <button id="btn-export" class="export-btn">📤 Export</button>
+                </div>
+            </aside>
+
+            <!-- Center: Viewport -->
+            <main class="viewport">
+                <!-- Toolbar Overlays -->
+                <div class="viewport-header">
+                    <div class="viewport-tools-container">
+                        <div class="tool-group">
+                            <button id="btn-zoom-out" class="tool-icon" title="Zoom Out">−</button>
+                            <div id="zoom-level-display" class="zoom-display">100%</div>
+                            <button id="btn-zoom-in" class="tool-icon" title="Zoom In">+</button>
+                        </div>
+                        <div class="tool-separator"></div>
+                        <div class="tool-group specialized-tools">
+                            <button id="btn-wl-reset" class="tool-icon stylized-btn" title="Reset All Settings">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                                    <path d="M3 3v5h5" />
+                                </svg>
+                            </button>
+                            <button id="btn-wl-tool" class="tool-icon stylized-btn" title="Window/Level Tool">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <circle cx="12" cy="12" r="5" />
+                                    <path
+                                        d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                                </svg>
+                            </button>
+                            <button id="btn-invert" class="tool-icon stylized-btn" title="Flip Contrast">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="12" y1="2" x2="12" y2="22" />
+                                    <path d="M12 22a10 10 0 0 0 0-20z" fill="currentColor" fill-opacity="0.5" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="tool-separator"></div>
+                        <div class="tool-group">
+                            <button id="btn-layout" class="tool-icon" title="Crosshair">✛</button>
+                            <button id="btn-marker" class="tool-icon" title="Marker Tool">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                                    <circle cx="12" cy="10" r="3" />
+                                </svg>
+                            </button>
+                            <button id="btn-measure" class="tool-icon" title="Measure Tool">↔</button>
+                        </div>
+                        <div class="tool-separator"></div>
+                        <div class="tool-group">
+                            <button id="btn-ai-analyze" class="tool-icon ai-btn" title="AI Analysis (LMStudio)">
+                                <span class="ai-label">AI</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="series-overlay-info">
+                        <div class="series-title" id="vpc-series-desc">...</div>
+                        <div class="series-subtitle" id="vpc-series-tech">...</div>
+                        <div class="series-date" id="vpc-series-date"></div>
+                    </div>
+                    <!-- Ruler Overlay -->
+
+                </div>
+
+                <!-- Main Image Canvas -->
+                <div class="image-canvas" id="image-canvas">
+                    <img id="main-image" src="" draggable="false">
+
+                    <!-- SVG Annotation Overlay -->
+                    <svg id="annotation-overlay" class="annotation-overlay">
+                        <g id="annotation-group"></g>
+                    </svg>
+
+
+
+                    <!-- High-tech crosshairs/markers -->
+
+
+
+                    <!-- Ruler Overlay -->
+                    <div id="ruler-container" class="ruler-container">
+                        <div class="ruler-scale" id="ruler-scale"></div>
+                        <div class="ruler-label" id="ruler-label"></div>
+                    </div>
+                </div>
+
+                <!-- Bottom Controls -->
+                <div class="bottom-controls">
+                    <div class="slice-row">
+                        <button id="btn-slice-prev" class="step-btn" title="Previous Slice">◀</button>
+                        <div class="slice-label">Slice: <span id="vpc-slice-idx">0</span> / <span
+                                id="vpc-slice-total">0</span></div>
+                        <button id="btn-slice-next" class="step-btn" title="Next Slice">▶</button>
+                        <input type="range" id="scrubber-slice" min="0" value="0" step="1" class="slice-scrubber">
+                    </div>
+                    <div class="divider-line"></div>
+                    <div class="adjustment-row">
+                        <div class="adj-group">
+                            <label>BRIGHTNESS</label>
+                            <input type="range" id="scrubber-brightness" min="50" max="150" value="100">
+                            <span class="adj-val">100%</span>
+                        </div>
+                        <div class="adj-group">
+                            <label>CONTRAST</label>
+                            <input type="range" id="scrubber-contrast" min="50" max="150" value="100">
+                            <span class="adj-val">100%</span>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Right Sidebar: Info -->
+            <aside class="sidebar-right">
+                <div class="info-viewport">
+                    <section class="info-section">
+                        <h3 class="section-label">SERIES INFORMATION</h3>
+                        <div class="info-row">
+                            <span class="info-key">Description</span>
+                            <span class="info-val bold" id="info-desc">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-key">Clinic</span>
+                            <span class="info-val" id="info-clinic">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-key">Machine</span>
+                            <span class="info-val" id="info-machine">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-key">Protocol</span>
+                            <span class="info-val" id="info-protocol">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-key">Modality</span>
+                            <span class="info-val right" id="info-modality">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-key">Images</span>
+                            <span class="info-val right" id="info-images">-</span>
+                        </div>
+                    </section>
+
+                    <section class="info-section">
+                        <h3 class="section-label">SCAN PARAMETERS</h3>
+                        <div class="info-row">
+                            <span class="info-key">Slice Thickness</span>
+                            <span class="info-val right" id="info-thickness">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-key">TR (ms)</span>
+                            <span class="info-val right" id="info-tr">-</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-key">TE (ms)</span>
+                            <span class="info-val right" id="info-te">-</span>
+                        </div>
+                    </section>
+
+                    <section class="info-section">
+                        <h3 class="section-label">SEQUENCE TYPE</h3>
+                        <div class="sequence-card" id="seq-card">
+                            <div class="seq-icon" id="seq-icon">💧</div>
+                            <div class="seq-name" id="seq-name">SWI</div>
+                        </div>
+                        <p class="sequence-desc" id="seq-desc">
+                            Susceptibility-weighted imaging is sensitive to blood products, calcification, and iron.
+                            Used for detecting microbleeds.
+                        </p>
+                    </section>
+                </div>
+            </aside>
+        </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- Patient-centered modules (load first) -->
+    <script src="js/patientUI.js"></script>
+    <script src="js/projectUI.js"></script>
+    <script src="js/importUI.js"></script>
+    <!-- Main app (load after modules) -->
+    <script src="js/app.js"></script>
+    <script src="js/export.js"></script>
+
+    <!-- AI Settings Modal -->
+    <div id="ai-settings-modal" class="modal-overlay hidden">
+        <div class="modal-content ai-modal">
+            <div class="modal-header">
+                <h2>AI Analysis Settings</h2>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Analyze</label>
+                    <div class="analysis-mode-selector">
+                        <button type="button" class="analysis-mode-btn active" data-mode="current" id="mode-current">📷
+                            Current Slice</button>
+                        <button type="button" class="analysis-mode-btn" data-mode="series" id="mode-series">📚 Full
+                            Series</button>
+                    </div>
+                </div>
+                <div class="form-group" id="sampling-group">
+                    <label>Slice Sampling (Every N-th slice)</label>
+                    <input type="number" id="ai-sample" value="1" min="1">
+                    <small class="form-hint">Only applies to Full Series mode.</small>
+                </div>
+                <div class="form-group">
+                    <label>Analysis Prompt</label>
+                    <textarea id="ai-prompt" rows="6">You are a radiology assistant providing clinical decision support. For this MRI slice:
+
+1. **Anatomical Structures**: Identify ALL visible structures (brain, sinuses, orbits, vessels, bone, soft tissue, etc.).
+2. **Findings**: List observations for EACH structure (signal changes, lesions, atrophy, fluid, asymmetries).
+3. **Locations**: For each finding, give coordinates as [x%, y%] from top-left.
+4. **Assessment**: Rate each finding as NORMAL, VARIANT, or NEEDS REVIEW.
+
+IMPORTANT: Analyze everything visible. Output findings only. No disclaimers.</textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-run-ai" class="btn-primary">🚀 Run Analysis</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Results Modal -->
+    <div id="ai-results-modal" class="modal-overlay hidden">
+        <div class="modal-content ai-modal large">
+            <div class="modal-header">
+                <h2>AI Findings</h2>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body scrollable">
+                <div id="ai-loading" class="ai-loading-container hidden">
+                    <div class="quantum-spinner"></div>
+                    <p id="ai-status-text">Starting LM Studio server...</p>
+                    <small class="ai-status-hint">This may take a moment for the first slice.</small>
+                </div>
+                <div id="ai-content" class="ai-markdown-content">
+                    <!-- Markdown content here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="btn-copy-ai">Copy to Clipboard</button>
+                <button class="btn-primary"
+                    onclick="this.closest('.modal-overlay').classList.add('hidden')">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Lightbox Modal -->
+    <div id="ai-lightbox" class="lightbox-overlay hidden"
+        onclick="if(event.target === this) this.classList.add('hidden')">
+        <div class="lightbox-content">
+            <button class="lightbox-close"
+                onclick="document.getElementById('ai-lightbox').classList.add('hidden')">&times;</button>
+            <div class="lightbox-image-container">
+                <img id="lightbox-image" src="" alt="Expanded view">
+                <svg id="lightbox-markers" class="lightbox-markers"></svg>
+            </div>
+            <div id="lightbox-caption" class="lightbox-caption"></div>
+        </div>
+    </div>
+</body>
+
+</html>
