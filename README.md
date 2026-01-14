@@ -79,42 +79,41 @@ To enable the AI analysis features:
 
 ## User Guide
 
-### 1. Create a Project
+### 1. Import Scans (Start Here)
 
-1. Click **"Create New Project"**.
-2. Enter a project name (e.g., "Patient_Brain_Study").
-3. Click **"Create Project"**.
+Everything starts with importing data. There is no manual "Create Project" step; the system automatically organizes scans by Patient and Study.
 
-### 2. Import Scans
-
-You can import scans from a folder containing DICOM files or pre-processed JPEGs.
-
-1. Click **"Import Scans"**.
-2. Select **"DICOM Folder"** (or JPEG Folder).
-3. Enter the **full absolute path** to your data folder.
+1. Click **"Import DICOM Scans"**.
+2. Enter the **full absolute path** to your data folder.
    - Example: `/Users/username/Documents/DICOM_DATA`
-4. Click **"Start Import"**.
+3. Click **"Start Import"**.
+4. The system will read the files, extract metadata, and automatically create/update the Patient record.
+
+### 2. View Patient
+
+1. After import, the patient appearing in the **"Recent Patients"** list.
+2. Click the patient card to view all their studies.
+3. Select a specific study or view them all in the unified viewer.
 
 ## Developer API
 
-The Flask backend provides REST endpoints for integration:
+The Flask backend provides REST endpoints for the patient-centric architecture:
 
-### Projects
+### Patients
 
-- `GET /api/projects` - List all projects
-- `POST /api/projects` - Create new project
-- `GET /api/projects/:id` - Load project
-- `DELETE /api/projects/:id` - Delete project
+- `GET /api/patients` - List all patients
+- `GET /api/patients/:id` - Get patient details
+- `DELETE /api/patients/:id` - Delete patient and all studies
+
+### Studies
+
+- `GET /api/patients/:id/studies/:studyId` - Load specific study
+- `GET /api/patients/:id/all-series` - Load all series for a patient
 
 ### Imports
 
-- `POST /api/projects/:id/import` - Start import
-- `GET /api/projects/:id/import/:importId/progress` - Track progress (SSE)
-
-### Annotations
-
-- `GET /api/projects/:id/annotations` - Load annotations
-- `POST /api/projects/:id/annotations` - Save annotations
+- `POST /api/import/dicom` - Start DICOM import (auto-categorization)
+- `GET /api/import/:importId/progress` - Track progress (SSE)
 
 ## File Structure
 
