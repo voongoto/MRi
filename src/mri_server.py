@@ -371,6 +371,7 @@ def run_ai_analysis_stream():
         prompt = data.get('prompt', "Analyze these MRI slices.")
         mode = data.get('mode', 'series')  # 'current' or 'series'
         slice_index = int(data.get('sliceIndex', 0))
+        specialists = data.get('specialists', [])
 
         if not project_id or not series_id:
             return jsonify({'error': 'projectId and seriesId are required'}), 400
@@ -394,7 +395,7 @@ def run_ai_analysis_stream():
         def generate():
             from ai_analyzer import analyze_series_ai_streaming
             
-            for event in analyze_series_ai_streaming(series_path, sample, prompt, mode, slice_index):
+            for event in analyze_series_ai_streaming(series_path, sample, prompt, mode, slice_index, specialists):
                 yield f"data: {json.dumps(event)}\n\n"
         
         return Response(

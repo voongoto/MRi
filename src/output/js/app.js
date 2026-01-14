@@ -1514,7 +1514,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         async runAnalysis() {
             const sample = document.getElementById('ai-sample').value;
-            const prompt = document.getElementById('ai-prompt').value;
+            // user prompt removed in favor of specialist protocols
+            const prompt = "";
 
             // Ensure we have IDs
             const projectId = currentSeries.projectId || (currentProject ? currentProject.projectId : null);
@@ -1538,6 +1539,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const analyzeMode = this.analysisMode || 'current';
             const currentSliceIndex = currentImageIndex || 0;
 
+            // Collect selected specialists
+            const selectedSpecialists = Array.from(document.querySelectorAll('input[name="ai-specialist"]:checked'))
+                .map(cb => cb.value);
+
+            if (selectedSpecialists.length === 0) {
+                alert('Please select at least one specialist.');
+                return;
+            }
+
             // Use fetch with streaming for SSE
             try {
                 const response = await fetch('http://127.0.0.1:8000/api/analyze/ai/stream', {
@@ -1549,7 +1559,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         sample: analyzeMode === 'current' ? 1 : parseInt(sample),
                         prompt,
                         mode: analyzeMode,
-                        sliceIndex: currentSliceIndex
+                        sliceIndex: currentSliceIndex,
+                        specialists: selectedSpecialists
                     })
                 });
 
@@ -1596,28 +1607,164 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'status':
                     if (statusText) statusText.textContent = event.message;
                     break;
-
                 case 'progress':
-                    if (statusText) statusText.textContent = `Analyzing slice ${event.current} of ${event.total}...`;
+                    if (statusText) statusText.textContent = event.status || `Analyzing slice ${event.current} of ${event.total}...`;
                     break;
-
-                case 'slice':
+                case 'slice_start':
                     els.aiLoading.classList.add('hidden');
-                    this.appendSliceCard(event);
+                    this.createPendingSliceCard(event);
                     break;
-
+                case 'specialist_result':
+                    // In non-streaming mode, this is the main event we get
+                    this.appendSpecialistResult(event);
+                    break;
+                case 'specialist_delta':
+                    // Kept for compatibility but likely unused now
+                    this.handleSpecialistDelta(event);
+                    break;
+                case 'slice_complete':
+                    this.finalizeSliceCard(event);
+                    break;
                 case 'error':
                     els.aiLoading.classList.add('hidden');
                     els.aiContent.innerHTML += `<div class="error-text">Error: ${event.message}</div>`;
                     break;
-
                 case 'complete':
                     if (statusText) statusText.textContent = `Analysis complete! (${event.total} slices)`;
+                    break;
+                case 'slice': // Legacy/Backup
+                    els.aiLoading.classList.add('hidden');
+                    this.appendSliceCard(event);
                     break;
             }
         },
 
+        createPendingSliceCard(slice) {
+            const card = document.createElement('div');
+            card.className = 'ai-slice-card pending';
+            card.id = `ai-card-${slice.index}`;
+            card.dataset.analysis = '';
+            card.dataset.thumbnail = slice.thumbnail || '';
+
+            const thumbnail = slice.thumbnail
+                ? `<img src="data:image/jpeg;base64,${slice.thumbnail}" class="ai-slice-thumb" alt="${slice.filename}">`
+                : '<div class="ai-slice-thumb-placeholder">No image</div>';
+
+            card.innerHTML = `
+                ${thumbnail}
+                <div class="ai-slice-content">
+                    <div class="ai-slice-header">Slice ${slice.index}/${slice.total}: ${slice.filename}</div>
+                    <div class="ai-slice-results-container"></div>
+                    <div class="ai-slice-spinner">
+                        <span class="spinner-small"></span> <span class="ai-specialist-status">Waiting for specialists...</span>
+                    </div>
+                </div>
+            `;
+
+            const thumb = card.querySelector('.ai-slice-thumb');
+            if (thumb) {
+                thumb.onclick = () => this.openLightbox(slice.thumbnail, card.dataset.analysis, slice.filename, slice.series_index);
+            }
+
+            els.aiContent.appendChild(card);
+            els.aiContent.scrollTop = els.aiContent.scrollHeight;
+        },
+
+        handleSpecialistDelta(event) {
+            const card = document.getElementById(`ai-card-${event.index}`);
+            if (!card) return;
+
+            const container = card.querySelector('.ai-slice-results-container');
+            const statusSpan = card.querySelector('.ai-specialist-status');
+
+            // Find or create specialist section
+            const sectionId = `specialist-${event.index}-${event.role.replace(/\s+/g, '-')}`;
+            let section = document.getElementById(sectionId);
+
+            if (!section) {
+                section = document.createElement('div');
+                section.id = sectionId;
+                section.className = 'ai-specialist-section fade-in';
+                section.innerHTML = `
+                    <div class="specialist-header">
+                        <span class="specialist-icon">👨‍⚕️</span> 
+                        <strong>${event.role}</strong> 
+                        <span class="specialist-focus">(${event.focus})</span>
+                    </div>
+                    <div class="ai-slice-text"></div>
+                `;
+                container.appendChild(section);
+                els.aiContent.scrollTop = els.aiContent.scrollHeight;
+            }
+
+            const textDiv = section.querySelector('.ai-slice-text');
+            if (textDiv && event.delta) {
+                // Accumulate delta
+                const currentText = (textDiv.dataset.rawText || "") + event.delta;
+                textDiv.dataset.rawText = currentText;
+                textDiv.innerHTML = this.formatMarkdown(currentText);
+
+                // Auto-scroll
+                const isAtBottom = els.aiContent.scrollHeight - els.aiContent.scrollTop <= els.aiContent.clientHeight + 100;
+                if (isAtBottom) {
+                    els.aiContent.scrollTop = els.aiContent.scrollHeight;
+                }
+            }
+
+            // Update status
+            if (statusSpan) statusSpan.textContent = `Receiving ${event.role} findings...`;
+        },
+
+        appendSpecialistResult(event) {
+            const card = document.getElementById(`ai-card-${event.index}`);
+            if (!card) return;
+
+            const container = card.querySelector('.ai-slice-results-container');
+            const statusSpan = card.querySelector('.ai-specialist-status');
+
+            const sectionId = `specialist-${event.index}-${event.role.replace(/\s+/g, '-')}`;
+            let section = document.getElementById(sectionId);
+
+            if (!section) {
+                // If we didn't get deltas (fallback), create full section
+                section = document.createElement('div');
+                section.id = sectionId;
+                section.className = 'ai-specialist-section fade-in';
+                container.appendChild(section);
+            }
+
+            section.innerHTML = `
+                <div class="specialist-header">
+                    <span class="specialist-icon">👨‍⚕️</span> 
+                    <strong>${event.role}</strong> 
+                    <span class="specialist-focus">(${event.focus})</span>
+                </div>
+                <div class="ai-slice-text">${this.formatMarkdown(event.analysis)}</div>
+            `;
+
+            // Update accumulated analysis for lightbox/copy
+            let currentAnalysis = card.dataset.analysis || "";
+            card.dataset.analysis = currentAnalysis + `\n\n#### ${event.focus} Findings\n${event.analysis}`;
+
+            // Update status
+            if (statusSpan) statusSpan.textContent = "Processing next specialist...";
+        },
+
+        finalizeSliceCard(event) {
+            const card = document.getElementById(`ai-card-${event.index}`);
+            if (!card) return;
+
+            // Remove spinner
+            const spinner = card.querySelector('.ai-slice-spinner');
+            if (spinner) spinner.remove();
+
+            card.classList.remove('pending');
+            // Ensure dataset has full report
+            card.dataset.analysis = event.full_report;
+        },
+
         appendSliceCard(slice) {
+            // Legacy/Fallback method
             const card = document.createElement('div');
             card.className = 'ai-slice-card';
             card.dataset.analysis = slice.analysis || '';
@@ -1635,10 +1782,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
 
-            // Click on thumbnail to expand
             const thumb = card.querySelector('.ai-slice-thumb');
             if (thumb) {
-                thumb.onclick = () => this.openLightbox(slice.thumbnail, slice.analysis, slice.filename, slice.index);
+                thumb.onclick = () => this.openLightbox(slice.thumbnail, slice.analysis, slice.filename, slice.series_index);
             }
 
             els.aiContent.appendChild(card);

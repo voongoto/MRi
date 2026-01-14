@@ -233,7 +233,7 @@
         <div class="modal-content ai-modal">
             <div class="modal-header">
                 <h2>AI Analysis Settings</h2>
-                <button class="close-modal">&times;</button>
+                <button class="modal-close close-modal">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
@@ -250,16 +250,23 @@
                     <input type="number" id="ai-sample" value="1" min="1">
                     <small class="form-hint">Only applies to Full Series mode.</small>
                 </div>
+                <!-- Specialist Selection -->
                 <div class="form-group">
-                    <label>Analysis Prompt</label>
-                    <textarea id="ai-prompt" rows="6">You are a radiology assistant providing clinical decision support. For this MRI slice:
-
-1. **Anatomical Structures**: Identify ALL visible structures (brain, sinuses, orbits, vessels, bone, soft tissue, etc.).
-2. **Findings**: List observations for EACH structure (signal changes, lesions, atrophy, fluid, asymmetries).
-3. **Locations**: For each finding, give coordinates as [x%, y%] from top-left.
-4. **Assessment**: Rate each finding as NORMAL, VARIANT, or NEEDS REVIEW.
-
-IMPORTANT: Analyze everything visible. Output findings only. No disclaimers.</textarea>
+                    <label>Specialist Panel</label>
+                    <div class="specialist-toggles">
+                        <label class="toggle-checkbox">
+                            <input type="checkbox" name="ai-specialist" value="ENT Radiologist" checked>
+                            <span class="toggle-label">ENT (Sinuses/Airways)</span>
+                        </label>
+                        <label class="toggle-checkbox">
+                            <input type="checkbox" name="ai-specialist" value="Musculoskeletal Radiologist" checked>
+                            <span class="toggle-label">Bone/structure</span>
+                        </label>
+                        <label class="toggle-checkbox">
+                            <input type="checkbox" name="ai-specialist" value="Neuroradiologist" checked>
+                            <span class="toggle-label">Soft Tissue/Neuro</span>
+                        </label>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -273,7 +280,7 @@ IMPORTANT: Analyze everything visible. Output findings only. No disclaimers.</te
         <div class="modal-content ai-modal large">
             <div class="modal-header">
                 <h2>AI Findings</h2>
-                <button class="close-modal">&times;</button>
+                <button class="modal-close close-modal">&times;</button>
             </div>
             <div class="modal-body scrollable">
                 <div id="ai-loading" class="ai-loading-container hidden">

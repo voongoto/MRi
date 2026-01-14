@@ -1842,3 +1842,54 @@ input[type=range]::-webkit-slider-thumb {
     border-color: #8b5cf6;
     color: white;
 }
+
+/* Specialist Toggles Override */
+.specialist-toggles {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 24px;
+    margin-top: 8px;
+    align-items: center;
+}
+
+.toggle-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    background: transparent;
+    padding: 0;
+    border: none;
+    transition: all 0.2s;
+    opacity: 0.7;
+}
+
+.toggle-checkbox:hover {
+    opacity: 1;
+}
+
+.toggle-checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    cursor: pointer;
+    accent-color: #8b5cf6;
+}
+
+.toggle-checkbox:has(input:checked) {
+    background: transparent;
+    border-color: transparent;
+    opacity: 1;
+}
+
+.toggle-checkbox:has(input:checked) .toggle-label {
+    color: #c4b5fd;
+    font-weight: 500;
+}
+
+.toggle-label {
+    font-size: 0.85rem;
+    color: var(--text-main);
+    user-select: none;
+}
