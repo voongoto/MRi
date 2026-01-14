@@ -711,30 +711,50 @@ document.addEventListener('DOMContentLoaded', () => {
     const studyId = urlParams.get('study');
     const projectId = urlParams.get('project');
 
-    // Initialize PatientUI
-    window.patientUI = new PatientUI();
+    // EXPORT MODE: If MRI_DATA is available (embedded from export), use it directly
+    if (typeof MRI_DATA !== 'undefined') {
+        // Export mode - initialize directly from embedded data
+        appData = MRI_DATA;
 
-    // Back button handler - navigate to main screen
-    const backBtn = document.querySelector('.nav-btn');
-    if (backBtn) {
-        backBtn.onclick = () => {
-            // Clear URL parameters and go to main screen
-            window.location.href = window.location.pathname;
-        };
-    }
+        // Set header info from first series
+        if (appData.series && appData.series.length > 0) {
+            const firstSeries = appData.series[0];
+            if (els.headerName) els.headerName.textContent = firstSeries.patient || 'Exported Study';
+            if (els.headerDate) {
+                const d = firstSeries.date || '';
+                els.headerDate.textContent = d.length === 8 ?
+                    `${d.substring(0, 4)}-${d.substring(4, 6)}-${d.substring(6, 8)}` : d;
+            }
+        }
 
-    if (patientId && studyId) {
-        // Patient + study URL: load single study
-        window.patientUI.loadStudy(patientId, studyId);
-    } else if (patientId) {
-        // Patient-only URL: load ALL studies (unified view)
-        window.patientUI.loadPatient(patientId);
-    } else if (projectId) {
-        // Legacy project URL: load project directly
-        window.projectUI.loadProject(projectId);
+        // Initialize viewer directly
+        init();
     } else {
-        // Show patient-centered empty state
-        window.patientUI.showEmptyState();
+        // Normal server mode - Initialize PatientUI
+        window.patientUI = new PatientUI();
+
+        // Back button handler - navigate to main screen
+        const backBtn = document.querySelector('.nav-btn');
+        if (backBtn) {
+            backBtn.onclick = () => {
+                // Clear URL parameters and go to main screen
+                window.location.href = window.location.pathname;
+            };
+        }
+
+        if (patientId && studyId) {
+            // Patient + study URL: load single study
+            window.patientUI.loadStudy(patientId, studyId);
+        } else if (patientId) {
+            // Patient-only URL: load ALL studies (unified view)
+            window.patientUI.loadPatient(patientId);
+        } else if (projectId) {
+            // Legacy project URL: load project directly
+            window.projectUI.loadProject(projectId);
+        } else {
+            // Show patient-centered empty state
+            window.patientUI.showEmptyState();
+        }
     }
 
 
@@ -1408,6 +1428,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (els.mainImage) {
             els.mainImage.src = imgPath;
             els.mainImage.onload = () => {
+                // Load annotations from localStorage before rendering
+                MarkerTool.loadAnnotations(currentSeries.id, currentImageIndex);
                 MarkerTool.renderAnnotations();
 
                 if (typeof updateContrastInvert === 'function') updateContrastInvert();
@@ -1472,16 +1494,25 @@ document.addEventListener('DOMContentLoaded', () => {
         init() {
             if (!els.btnAiAnalyze) return;
 
+            // AI Analysis
             els.btnAiAnalyze.onclick = () => {
                 if (!currentSeries) {
-                    alert('Please select an MRI series first.');
+                    alert('Please select a series first.');
                     return;
                 }
                 els.aiSettingsModal.classList.remove('hidden');
+                // Fetch models when opening
+                this.fetchAvailableModels();
             };
 
             els.btnRunAi.onclick = () => this.runAnalysis();
-            els.btnCopyAi.onclick = () => this.copyResults();
+            els.btnCopyAi.onclick = () => this.saveToFile();
+
+            // Refresh button
+            const btnRefresh = document.getElementById('btn-refresh-models');
+            if (btnRefresh) {
+                btnRefresh.onclick = () => this.fetchAvailableModels();
+            }
 
             // Mode selector buttons
             this.analysisMode = 'current'; // 'current' or 'series'
@@ -1543,6 +1574,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const selectedSpecialists = Array.from(document.querySelectorAll('input[name="ai-specialist"]:checked'))
                 .map(cb => cb.value);
 
+            const customModel = document.getElementById('ai-model-select').value;
+            // Removed manual input, using dropdown which might be empty string for auto
+
             if (selectedSpecialists.length === 0) {
                 alert('Please select at least one specialist.');
                 return;
@@ -1560,7 +1594,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         prompt,
                         mode: analyzeMode,
                         sliceIndex: currentSliceIndex,
-                        specialists: selectedSpecialists
+                        specialists: selectedSpecialists,
+                        customModel: customModel // Pass selected model
                     })
                 });
 
@@ -1599,6 +1634,51 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch (err) {
                 els.aiLoading.classList.add('hidden');
                 els.aiContent.innerHTML = `<div class="error-text">Error: ${err.message}</div>`;
+            }
+        },
+
+        async fetchAvailableModels() {
+            const select = document.getElementById('ai-model-select');
+            const btnRefresh = document.getElementById('btn-refresh-models');
+            if (!select) return;
+
+            try {
+                if (btnRefresh) btnRefresh.classList.add('spinning');
+
+                // Clear existing except default
+                select.innerHTML = '<option value="">Auto-detect (Best available)</option>';
+                select.disabled = true;
+
+                const response = await fetch('http://127.0.0.1:8000/api/ai/models');
+                if (response.ok) {
+                    const data = await response.json();
+                    const models = data.models || [];
+
+                    if (models.length === 0) {
+                        const opt = document.createElement('option');
+                        opt.text = "No models found (Check LM Studio)";
+                        opt.disabled = true;
+                        select.add(opt);
+                    } else {
+                        models.forEach(model => {
+                            const opt = document.createElement('option');
+                            opt.value = model.id;
+                            opt.text = model.id;
+                            if (model.loaded) {
+                                opt.text += " (Loaded)";
+                                opt.selected = true; // Default to loaded model
+                            }
+                            select.add(opt);
+                        });
+                    }
+                } else {
+                    console.error("Failed to fetch models");
+                }
+            } catch (e) {
+                console.error("Error fetching models:", e);
+            } finally {
+                select.disabled = false;
+                if (btnRefresh) btnRefresh.classList.remove('spinning');
             }
         },
 
@@ -1901,14 +1981,310 @@ document.addEventListener('DOMContentLoaded', () => {
             els.aiContent.innerHTML = html;
         },
 
-        copyResults() {
-            const text = els.aiContent.innerText;
-            navigator.clipboard.writeText(text).then(() => {
-                const btn = els.btnCopyAi;
-                const oldText = btn.innerText;
-                btn.innerText = 'Copied!';
+        async saveToFile() {
+            const btn = els.btnCopyAi;
+            const oldText = btn.innerText;
+            btn.innerText = 'Generating...';
+            btn.disabled = true;
+
+            try {
+                // Collect all slice cards data
+                const cards = els.aiContent.querySelectorAll('.ai-slice-card');
+                const slicesData = [];
+
+                for (const card of cards) {
+                    const header = card.querySelector('.ai-slice-header')?.textContent || 'Unknown Slice';
+                    const thumbnail = card.dataset.thumbnail || '';
+                    const analysis = card.dataset.analysis || '';
+
+                    // Get the full image if possible
+                    let fullImageB64 = '';
+                    const thumbImg = card.querySelector('.ai-slice-thumb');
+                    if (thumbImg && thumbImg.src) {
+                        // Try to load full resolution image
+                        try {
+                            // Extract slice index from header (e.g., "Slice 19/47: 0018.jpg")
+                            const match = header.match(/Slice (\d+)/);
+                            const sliceIndex = match ? parseInt(match[1]) - 1 : null;
+
+                            if (sliceIndex !== null && currentSeries && currentSeries.images && currentSeries.images[sliceIndex]) {
+                                const projectId = currentSeries.projectId || (currentProject ? currentProject.projectId : null);
+                                let imgPath;
+                                if (currentSeries.imagePath && projectId) {
+                                    imgPath = `/projects/${projectId}/${currentSeries.imagePath}/${currentSeries.images[sliceIndex]}`;
+                                } else {
+                                    imgPath = `img/${currentSeries.id}/${currentSeries.images[sliceIndex]}`;
+                                }
+
+                                // Fetch and convert to base64
+                                const response = await fetch(imgPath);
+                                if (response.ok) {
+                                    const blob = await response.blob();
+                                    fullImageB64 = await new Promise((resolve) => {
+                                        const reader = new FileReader();
+                                        reader.onloadend = () => resolve(reader.result);
+                                        reader.readAsDataURL(blob);
+                                    });
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('Could not load full image:', e);
+                        }
+                    }
+
+                    slicesData.push({
+                        header,
+                        thumbnail,
+                        fullImage: fullImageB64,
+                        analysis
+                    });
+                }
+
+                // Generate HTML content
+                const seriesInfo = currentSeries ? {
+                    description: currentSeries.description || 'Unknown Series',
+                    modality: currentSeries.modality || 'MR',
+                    date: currentSeries.date || '',
+                    images: currentSeries.images?.length || 0
+                } : {};
+
+                const htmlContent = this.generateReportHTML(slicesData, seriesInfo);
+
+                // Create and download file
+                const blob = new Blob([htmlContent], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                const timestamp = new Date().toISOString().slice(0, 10);
+                const filename = `MRI_Analysis_${seriesInfo.description?.replace(/[^a-zA-Z0-9]/g, '_') || 'Report'}_${timestamp}.html`;
+
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                btn.innerText = 'Saved!';
                 setTimeout(() => btn.innerText = oldText, 2000);
-            });
+
+            } catch (error) {
+                console.error('Save failed:', error);
+                btn.innerText = 'Error!';
+                setTimeout(() => btn.innerText = oldText, 2000);
+            } finally {
+                btn.disabled = false;
+            }
+        },
+
+        generateReportHTML(slicesData, seriesInfo) {
+            const slicesHTML = slicesData.map((slice, index) => `
+                <div class="slice-section">
+                    <h2>${slice.header}</h2>
+                    <div class="images-container">
+                        ${slice.thumbnail ? `
+                        <div class="image-box">
+                            <h3>Thumbnail</h3>
+                            <img src="data:image/jpeg;base64,${slice.thumbnail}" alt="Thumbnail" class="thumbnail">
+                        </div>
+                        ` : ''}
+                        ${slice.fullImage ? `
+                        <div class="image-box">
+                            <h3>Full Resolution</h3>
+                            <img src="${slice.fullImage}" alt="Full Image" class="full-image">
+                        </div>
+                        ` : ''}
+                    </div>
+                    <div class="analysis-content">
+                        <h3>Analysis</h3>
+                        <div class="analysis-text">${this.formatMarkdown(slice.analysis)}</div>
+                    </div>
+                </div>
+            `).join('\n');
+
+            return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MRI Analysis Report - ${seriesInfo.description || 'Report'}</title>
+    <style>
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-card: #0f0f1a;
+            --text-primary: #e8e8e8;
+            --text-secondary: #a0a0a0;
+            --accent: #4fc3f7;
+            --accent-hover: #29b6f6;
+            --border: #2a2a4a;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 2rem;
+        }
+        
+        .report-header {
+            background: linear-gradient(135deg, var(--bg-secondary), var(--bg-card));
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border);
+        }
+        
+        .report-header h1 {
+            font-size: 1.8rem;
+            color: var(--accent);
+            margin-bottom: 1rem;
+        }
+        
+        .report-meta {
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+        
+        .report-meta span {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .slice-section {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+        }
+        
+        .slice-section h2 {
+            color: var(--accent);
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .images-container {
+            display: flex;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+        
+        .image-box {
+            flex: 1;
+            min-width: 250px;
+        }
+        
+        .image-box h3 {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .image-box img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        
+        .thumbnail {
+            max-height: 200px;
+            object-fit: contain;
+        }
+        
+        .full-image {
+            max-height: 400px;
+            object-fit: contain;
+        }
+        
+        .analysis-content h3 {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .analysis-text {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 1rem;
+            font-size: 0.95rem;
+            line-height: 1.7;
+        }
+        
+        .analysis-text strong {
+            color: var(--accent);
+        }
+        
+        .report-footer {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            margin-top: 2rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }
+        
+        @media print {
+            body {
+                background: white;
+                color: #333;
+                padding: 1rem;
+            }
+            
+            .report-header, .slice-section {
+                background: #f5f5f5;
+                border-color: #ddd;
+            }
+            
+            .report-header h1, .slice-section h2, .analysis-text strong {
+                color: #0066cc;
+            }
+            
+            .analysis-text {
+                background: #fafafa;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="report-header">
+        <h1>🏥 MRI Analysis Report</h1>
+        <div class="report-meta">
+            <span><strong>Series:</strong> ${seriesInfo.description || 'Unknown'}</span>
+            <span><strong>Modality:</strong> ${seriesInfo.modality || 'MR'}</span>
+            <span><strong>Images:</strong> ${seriesInfo.images || 0}</span>
+            <span><strong>Generated:</strong> ${new Date().toLocaleString()}</span>
+        </div>
+    </div>
+    
+    ${slicesHTML}
+    
+    <div class="report-footer">
+        <p>Generated by MRI Viewer AI Analysis • ${new Date().toISOString()}</p>
+    </div>
+</body>
+</html>`;
         }
     };
 

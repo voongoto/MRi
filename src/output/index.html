@@ -38,7 +38,8 @@
             <!-- Left Sidebar: Body Regions -->
             <aside class="sidebar-left">
                 <div class="sidebar-header">
-                    <button id="toggle-select-mode" class="select-mode-btn" title="Toggle selection mode">☑</button>
+                    <button id="toggle-select-mode" class="select-mode-btn" title="Toggle selection mode">☑
+                        Export</button>
                     <span>BODY REGIONS</span>
                 </div>
                 <div id="region-list" class="region-list">
@@ -250,21 +251,47 @@
                     <input type="number" id="ai-sample" value="1" min="1">
                     <small class="form-hint">Only applies to Full Series mode.</small>
                 </div>
+                <div class="form-group">
+                    <label>Model Selection</label>
+                    <div class="model-select-row">
+                        <select id="ai-model-select" class="model-select">
+                            <option value="">Auto-detect (Best available)</option>
+                        </select>
+                        <button id="btn-refresh-models" class="icon-btn" title="Refresh Models">🔄</button>
+                    </div>
+                    <small class="form-hint">Select a vision-capable model from LM Studio.</small>
+                </div>
                 <!-- Specialist Selection -->
                 <div class="form-group">
                     <label>Specialist Panel</label>
                     <div class="specialist-toggles">
                         <label class="toggle-checkbox">
-                            <input type="checkbox" name="ai-specialist" value="ENT Radiologist" checked>
-                            <span class="toggle-label">ENT (Sinuses/Airways)</span>
+                            <input type="checkbox" name="ai-specialist" value="ENT Radiologist">
+                            <span class="toggle-label">ENT (Sinuses)</span>
                         </label>
                         <label class="toggle-checkbox">
-                            <input type="checkbox" name="ai-specialist" value="Musculoskeletal Radiologist" checked>
-                            <span class="toggle-label">Bone/structure</span>
+                            <input type="checkbox" name="ai-specialist" value="Musculoskeletal Radiologist">
+                            <span class="toggle-label">Bone</span>
                         </label>
                         <label class="toggle-checkbox">
                             <input type="checkbox" name="ai-specialist" value="Neuroradiologist" checked>
-                            <span class="toggle-label">Soft Tissue/Neuro</span>
+                            <span class="toggle-label">Neuro</span>
+                        </label>
+                        <label class="toggle-checkbox">
+                            <input type="checkbox" name="ai-specialist" value="Spine Radiologist">
+                            <span class="toggle-label">Spine</span>
+                        </label>
+                        <label class="toggle-checkbox">
+                            <input type="checkbox" name="ai-specialist" value="Oncology Radiologist">
+                            <span class="toggle-label">Oncology</span>
+                        </label>
+                        <label class="toggle-checkbox">
+                            <input type="checkbox" name="ai-specialist" value="Vascular Radiologist">
+                            <span class="toggle-label">Vascular</span>
+                        </label>
+                        <label class="toggle-checkbox">
+                            <input type="checkbox" name="ai-specialist" value="General Radiologist" checked>
+                            <span class="toggle-label">General</span>
                         </label>
                     </div>
                 </div>
@@ -293,7 +320,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn-secondary" id="btn-copy-ai">Copy to Clipboard</button>
+                <button class="btn-secondary" id="btn-copy-ai">Save to File</button>
                 <button class="btn-primary"
                     onclick="this.closest('.modal-overlay').classList.add('hidden')">Done</button>
             </div>

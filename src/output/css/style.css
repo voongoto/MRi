@@ -333,6 +333,20 @@ body {
     color: white;
 }
 
+.icon-btn.spinning {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 .zoom-display {
     width: 50px;
     height: 38px;
@@ -1612,6 +1626,102 @@ input[type=range]::-webkit-slider-thumb {
     100% {
         transform: rotate(360deg);
     }
+}
+
+/* AI Modal Specifics */
+.ai-modal .modal-content {
+    background: #141416;
+    /* Slightly lighter than base for contrast */
+    padding: 32px;
+    /* More breathing room */
+    border-radius: 16px;
+    border: 1px solid var(--border-light);
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
+}
+
+.ai-modal h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 24px;
+    letter-spacing: -0.02em;
+    color: white;
+}
+
+.ai-modal .form-group {
+    margin-bottom: 24px;
+    /* Increased from 16px */
+}
+
+.ai-modal label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.ai-modal .form-hint {
+    margin-top: 8px;
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+/* Enhancing the specialists section */
+.specialist-toggles {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    margin-top: 12px;
+}
+
+.modal-actions {
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.btn-primary {
+    background: var(--accent);
+    color: white;
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 12px var(--accent-glow);
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    background: #2563eb;
+    box-shadow: 0 6px 16px var(--accent-glow);
+}
+
+.btn-secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+    background: var(--bg-hover);
+    color: white;
+    border-color: var(--text-muted);
 }
 
 .form-group {

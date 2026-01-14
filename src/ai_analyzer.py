@@ -54,46 +54,167 @@ def launch_lmstudio():
     """Attempt to launch LM Studio and start the local server."""
     import time
     
-    # First, check if server is already running
+    print("[AI] Checking LM Studio server status...")
+    
+    # Check if server is running
+    server_running = False
     try:
         test_response = requests.get("http://localhost:1234/v1/models", timeout=2)
         if test_response.status_code == 200:
             print("[AI] LM Studio server is already running.")
-            return True
+            server_running = True
     except:
-        pass  # Server not running, proceed to start it
+        pass
     
-    # Try to start the server using lms CLI
-    try:
-        print("[AI] Starting LM Studio server via CLI...")
-        subprocess.run(["lms", "server", "start"], check=False, capture_output=True)
-        
-        # Wait for server to become available (up to 15 seconds)
-        for i in range(15):
-            try:
-                test_response = requests.get("http://localhost:1234/v1/models", timeout=2)
-                if test_response.status_code == 200:
+    if not server_running:
+        # Try to start the server using lms CLI
+        try:
+            print("[AI] Starting LM Studio server via CLI...")
+            result = subprocess.run(["lms", "server", "start"], capture_output=True, text=True)
+            if result.returncode != 0:
+                print(f"[AI] Error starting server: {result.stderr}")
+            
+            # Wait for server
+            for i in range(15):
+                try:
+                    requests.get("http://localhost:1234/v1/models", timeout=2)
                     print(f"[AI] Server started successfully after {i+1}s.")
-                    return True
-            except:
-                pass
-            time.sleep(1)
+                    server_running = True
+                    break
+                except:
+                    time.sleep(1)
+            
+            if not server_running:
+                print("[AI] Server did not start in time. Trying to open app...")
+                subprocess.run(["open", "-a", "LM Studio"], check=False)
+                # Give it more time if opening the app
+                time.sleep(10)
+        except FileNotFoundError:
+            print("[AI] 'lms' CLI not found. Please ensure LM Studio is installed and the CLI is bootstrapped.")
+            subprocess.run(["open", "-a", "LM Studio"], check=False)
+            pass
+        except Exception as e:
+            print(f"[AI] Failed to launch LM Studio: {e}")
+            return False
+
+    # Now ensure a VISION model is loaded
+    try:
+        print("[AI] Verifying loaded model...")
+        # Check currently loaded models via API
+        response = requests.get("http://localhost:1234/v1/models", timeout=5)
+        current_models = []
+        if response.status_code == 200:
+            data = response.json()
+            current_models = [m['id'] for m in data.get('data', [])]
         
-        print("[AI] Server did not start in time. Please start it manually in LM Studio.")
-        return False
-    except FileNotFoundError:
-        # lms CLI not found, fall back to opening the app
-        print("[AI] lms CLI not found, opening LM Studio app...")
-        subprocess.run(["open", "-a", "LM Studio"], check=False)
-        return False
+        print(f"[AI] Currently loaded models: {current_models}")
+        
+        # Valid vision keywords
+        vision_keywords = ['vision', 'llava', 'moondream', 'minicpm', 'yi-vl', 'ministral', 'reasoning']
+        
+        has_vision = any(any(v in m.lower() for v in vision_keywords) for m in current_models)
+        
+        if not has_vision:
+            print("[AI] No vision model currently loaded. Scanning local library...")
+            
+            # List available models via CLI
+            ls_res = subprocess.run(["lms", "ls"], capture_output=True, text=True)
+            if ls_res.returncode != 0:
+                print("[AI] Failed to list models with 'lms ls'.")
+                return True # Can't do much else, hope the user loads one manually
+                
+            downloaded_output = ls_res.stdout
+            found_vision_model = None
+            
+            # Parse 'lms ls' output. Format is typically:
+            # LLM    PARAMS   ...
+            # model_id  ...
+            # Skip header lines
+            lines = downloaded_output.split('\n')
+            for line in lines:
+                if "PARAMS" in line or "SIZE" in line or not line.strip():
+                    continue
+                
+                # The first token is usually the model ID/name
+                parts = line.split()
+                if not parts:
+                    continue
+                    
+                model_id = parts[0]
+                
+                # Check against keywords
+                if any(k in model_id.lower() for k in vision_keywords):
+                    found_vision_model = model_id
+                    break
+            
+            if found_vision_model:
+                print(f"[AI] Found local vision model: {found_vision_model}. Loading...")
+                # Use --gpu max to ensure better performance if possible
+                load_res = subprocess.run(["lms", "load", found_vision_model, "--gpu", "max"], capture_output=True, text=True)
+                
+                if load_res.returncode == 0:
+                    print(f"[AI] Successfully loaded {found_vision_model}")
+                    # Give it a moment to initialize
+                    time.sleep(2)
+                else:
+                    print(f"[AI] Failed to load model: {load_res.stderr}")
+            else:
+                print("[AI] CRITICAL: No vision model found in LM Studio library.")
+                print("[AI] Please download a supported vision model (e.g., Llama 3.2 Vision, LLaVA, Moondream) in LM Studio.")
+                # We do not return False here, as we want to let the script try anyway in case our detection was wrong
+                # or maybe the text model can hallucinate something (worse case) but better to warn.
+                
     except Exception as e:
-        print(f"[AI] Failed to start LM Studio server: {e}")
-        return False
+        print(f"[AI] Error managing models: {e}")
+        
+    return True
+
+def list_available_models() -> List[Dict[str, Any]]:
+    """List all downloaded models available in LM Studio via CLI."""
+    try:
+        # Check if lms is available
+        result = subprocess.run(["lms", "ls"], capture_output=True, text=True)
+        if result.returncode != 0:
+            return []
+            
+        models = []
+        lines = result.stdout.split('\n')
+        
+        # Skip header and find data
+        # Header usually contains "LLM", "PARAMS", "ARCH", "SIZE"
+        # We'll just look for lines that look like model entries
+        for line in lines:
+            if not line.strip() or "LLM" in line and "PARAMS" in line:
+                continue
+                
+            parts = line.split()
+            if len(parts) >= 2:
+                model_id = parts[0]
+                # Filter out obvious non-model lines if any remain
+                if model_id == "You" or "disk" in line: 
+                    continue
+                    
+                # Check if loaded
+                is_loaded = "LOADED" in line
+                
+                models.append({
+                    "id": model_id,
+                    "name": model_id, # Use ID as name for now
+                    "loaded": is_loaded
+                })
+                
+        return models
+    except Exception as e:
+        print(f"Error listing models: {e}")
+        return []
+
 PREFERRED_VISION_MODELS = [
     "mistralai/ministral-3-14b-reasoning",
-    "llava-1.6-mistral-7b",
-    "llava-v1.5-7b",
-    "vision" # Any model with 'vision' in its ID
+    "llava",
+    "moondream",
+    "vision", # Any model with 'vision' in its ID
+    "minicpm",
+    "yi-vl"
 ]
 
 def get_active_model():
@@ -112,43 +233,148 @@ def get_active_model():
                         return mid
             
             if model_ids:
-                print(f"[AI] Falling back to first available model: {model_ids[0]}")
+                # If no preferred vision model is found, but we are here, 
+                # launch_lmstudio should have already warned or tried to load one.
+                # We'll take the first one but warn.
+                print(f"[AI] Warning: No preferred vision model identifier found. Using first available: {model_ids[0]}")
                 return model_ids[0]
+                
     except Exception as e:
         print(f"[AI] Error detecting models: {e}")
         
-    return "llava-1.6-mistral-7b" # Default fallback
+    return None # Return None instead of a made-up string if we really can't find one
 
 DIAGNOSTIC_PROTOCOLS = [
     {
         "role": "ENT Radiologist",
         "focus": "Sinus & Airway",
-        "prompt": """Evaluate sinuses (Maxillary, Ethmoid, Sphenoid, Frontal) and nasal cavities.
-Look for: Mucosal thickening, fluid levels, polyps, septal deviation, or airway obstruction.
+        "prompt": """CRITICAL: First, determine what anatomical region is actually visible in this MRI slice.
+
+Your domain is: Sinuses (Maxillary, Ethmoid, Sphenoid, Frontal) and nasal cavities.
+These structures are located in the ANTERIOR (front) of the head.
+
+IMPORTANT RULES:
+- If this slice shows the POSTERIOR (back) of the head (occipital lobe, cerebellum, posterior fossa), state: "This slice shows posterior anatomy. Sinus structures are not visible in this view."
+- Only analyze structures you can ACTUALLY SEE in the image. Do NOT describe anatomy that is not present.
+- If sinuses ARE visible, look for: Mucosal thickening, fluid levels, polyps, septal deviation, or airway obstruction.
 
 REQUIRED OUTPUT STRUCTURE (Be Concise):
-1. **Identified Areas**: List visible anatomical structures.
-2. **Analysis & Recommendations**: Brief analysis of each area. If pathology is found, suggest next steps."""
+1. **Visible Region**: State which anatomical region this slice shows (anterior/middle/posterior).
+2. **Identified Areas**: List ONLY the structures actually visible in THIS image.
+3. **Analysis & Recommendations**: Brief analysis of visible areas only. State "Not applicable - anatomy not visible" if your domain structures are not in this slice."""
     },
     {
         "role": "Musculoskeletal Radiologist",
         "focus": "Bones & Structure",
-        "prompt": """Evaluate facial skeleton and skull base.
-Look for: Cortical integrity, marrow signal changes, fractures, erosions, or lesions.
+        "prompt": """CRITICAL: First, determine what anatomical region is actually visible in this MRI slice.
+
+Your domain is: Facial skeleton, skull base, and bony structures.
+Evaluate based on WHAT IS ACTUALLY VISIBLE in this specific slice.
+
+IMPORTANT RULES:
+- Only analyze bony structures you can ACTUALLY SEE in the image.
+- Different slices show different anatomy - describe only what is present.
+- Look for: Cortical integrity, marrow signal changes, fractures, erosions, or lesions in VISIBLE structures only.
 
 REQUIRED OUTPUT STRUCTURE (Be Concise):
-1. **Identified Areas**: List visible anatomical structures.
-2. **Analysis & Recommendations**: Brief analysis of each area. If pathology is found, suggest next steps."""
+1. **Visible Region**: State which anatomical region this slice shows.
+2. **Identified Areas**: List ONLY the bony structures actually visible in THIS image.
+3. **Analysis & Recommendations**: Brief analysis of visible structures. If no relevant bony pathology domain structures visible, state so."""
     },
     {
         "role": "Neuroradiologist",
         "focus": "Soft Tissue & Vascular",
-        "prompt": """Evaluate soft tissues, brain parenchyma, orbits, and vascular flow voids.
-Look for: Abnormal signals, masses, inflammation, orbital issues, or brain morphology.
+        "prompt": """CRITICAL: First, determine what anatomical region is actually visible in this MRI slice.
+
+Your domain is: Brain parenchyma, soft tissues, orbits, and vascular structures.
+Evaluate based on WHAT IS ACTUALLY VISIBLE in this specific slice.
+
+IMPORTANT RULES:
+- Identify the specific brain regions visible (frontal lobe, parietal lobe, temporal lobe, occipital lobe, cerebellum, brainstem, etc.)
+- Only describe structures you can ACTUALLY SEE.
+- Look for: Abnormal signals, masses, inflammation, white matter changes, ventricular abnormalities, or vascular issues in VISIBLE structures.
 
 REQUIRED OUTPUT STRUCTURE (Be Concise):
-1. **Identified Areas**: List visible anatomical structures.
-2. **Analysis & Recommendations**: Brief analysis of each area. If pathology is found, suggest next steps."""
+1. **Visible Region**: State which brain/anatomical region this slice shows (e.g., "Posterior fossa showing cerebellum and occipital lobes").
+2. **Identified Areas**: List ONLY the neural/vascular structures actually visible in THIS image.
+3. **Analysis & Recommendations**: Brief analysis of visible structures only."""
+    },
+    {
+        "role": "Spine Radiologist",
+        "focus": "Spine & Cord",
+        "prompt": """CRITICAL: First, determine what anatomical region is actually visible in this MRI slice.
+
+Your domain is: Spinal column (cervical, thoracic, lumbar, sacral), intervertebral discs, spinal cord, and nerve roots.
+These structures are visible in SAGITTAL or AXIAL spine-focused sequences.
+
+IMPORTANT RULES:
+- If this is a HEAD/BRAIN MRI (axial brain slices), state: "This slice shows intracranial anatomy. Spinal structures are not the primary focus."
+- Only analyze spine/disc/cord structures you can ACTUALLY SEE.
+- If spine IS visible, look for: Disc herniation, bulging, stenosis, cord compression, signal changes, vertebral alignment, Modic changes.
+
+REQUIRED OUTPUT STRUCTURE (Be Concise):
+1. **Visible Region**: State the spinal level visible (e.g., "Cervical spine C3-C7" or "Brain - spine not visible").
+2. **Identified Areas**: List ONLY the spinal structures actually visible in THIS image.
+3. **Analysis & Recommendations**: Brief analysis of visible structures. State "Not applicable - spine not visible" if analyzing a brain-only slice."""
+    },
+    {
+        "role": "Oncology Radiologist",
+        "focus": "Tumors & Masses",
+        "prompt": """CRITICAL: First, determine what anatomical region is actually visible in this MRI slice.
+
+Your domain is: Detection and characterization of tumors, masses, cysts, and space-occupying lesions.
+You evaluate ANY visible region for neoplastic or mass-like abnormalities.
+
+IMPORTANT RULES:
+- First identify the anatomical region shown (brain, spine, sinuses, orbits, etc.)
+- Only describe lesions/masses you can ACTUALLY SEE - do NOT assume or fabricate findings.
+- Look for: Abnormal masses, enhancement patterns, mass effect, edema, midline shift, cystic vs solid lesions, irregular margins.
+- If NO suspicious masses are visible, clearly state: "No definite mass lesions identified in this slice."
+
+REQUIRED OUTPUT STRUCTURE (Be Concise):
+1. **Visible Region**: State which anatomical region this slice shows.
+2. **Mass Assessment**: Describe any masses/lesions ACTUALLY visible, or state "No masses identified."
+3. **Characterization**: If mass present - location, size estimate, signal characteristics, mass effect. If none - state "Not applicable."
+4. **Recommendations**: Further imaging or follow-up if indicated."""
+    },
+    {
+        "role": "Vascular Radiologist",
+        "focus": "Blood Vessels & Perfusion",
+        "prompt": """CRITICAL: First, determine what anatomical region is actually visible in this MRI slice.
+
+Your domain is: Arterial and venous structures, flow voids, aneurysms, vascular malformations, and perfusion abnormalities.
+Major intracranial vessels include: Circle of Willis, MCA, ACA, PCA, basilar artery, venous sinuses.
+
+IMPORTANT RULES:
+- Identify which vascular territories are visible based on the slice location.
+- Only describe vessels and flow patterns you can ACTUALLY SEE.
+- Standard MRI may have limited vascular detail - MRA/MRV sequences are better for vascular assessment.
+- Look for: Flow void irregularities, aneurysms, AVMs, venous thrombosis, vascular compression.
+
+REQUIRED OUTPUT STRUCTURE (Be Concise):
+1. **Visible Region**: State the anatomical region and which major vessels should be in this territory.
+2. **Vascular Structures Seen**: List ONLY vessels/flow voids actually visible in THIS image.
+3. **Analysis & Recommendations**: Assessment of visible vascular structures. Note if dedicated MRA/MRV would be beneficial."""
+    },
+    {
+        "role": "General Radiologist",
+        "focus": "Overall Assessment",
+        "prompt": """CRITICAL: First, determine what anatomical region is actually visible in this MRI slice.
+
+Your role is: Comprehensive overview assessment across all anatomical systems visible in this slice.
+You provide a unified summary that integrates findings from multiple domains.
+
+IMPORTANT RULES:
+- Identify the exact anatomical region and orientation (axial/sagittal/coronal).
+- Describe ALL visible structures systematically - do not focus on just one system.
+- Only describe what you can ACTUALLY SEE - avoid assumptions about adjacent slices.
+- Provide a holistic impression suitable for clinical correlation.
+
+REQUIRED OUTPUT STRUCTURE (Be Concise):
+1. **Image Orientation & Region**: State plane (axial/sagittal/coronal) and anatomical level.
+2. **Systematic Review**: Brief assessment of each visible system (brain, bone, soft tissue, vessels, CSF spaces).
+3. **Key Findings**: Summarize any abnormalities or notable observations.
+4. **Overall Impression**: One-line clinical summary."""
     }
 ]
 
@@ -169,8 +395,13 @@ def analyze_slice_with_protocol(img_path: str, protocol: Dict[str, str], context
 {context_prompt}
 Output your analysis for this specific domain only."""
 
+    model_id = get_active_model()
+    if not model_id:
+        yield f"Error: No vision model identified. Please check LM Studio."
+        return
+
     payload = {
-        "model": get_active_model(),
+        "model": model_id,
         "messages": [
             {
                 "role": "user",
@@ -251,7 +482,9 @@ def analyze_series_ai(series_path: str, sample: int = 1, prompt: str = ""):
 
 def analyze_series_ai_streaming(series_path: str, sample: int = 1, prompt: str = "", mode: str = "series", slice_index: int = 0, specialists: List[str] = None):
     """Generator that yields multi-pass analysis for each slice."""
-    launch_lmstudio()
+    if not launch_lmstudio():
+        yield {"type": "error", "message": "Failed to launch LM Studio or find a valid vision model."}
+        return
     
     # Filter protocols based on user selection
     active_protocols = DIAGNOSTIC_PROTOCOLS

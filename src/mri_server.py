@@ -411,6 +411,17 @@ def run_ai_analysis_stream():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/ai/models', methods=['GET'])
+def get_ai_models():
+    """Get list of available AI models from LM Studio"""
+    try:
+        from ai_analyzer import list_available_models
+        models = list_available_models()
+        return jsonify({'models': models}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 # ===== PROJECT DATA SERVING =====
 
 @app.route('/projects/<project_id>/img/<path:file_path>')

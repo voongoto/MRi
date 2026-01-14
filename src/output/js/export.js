@@ -429,21 +429,65 @@ async function exportSelectedSeries(selectedSeries, patientMeta) {
         selectedSeries.forEach(s => totalImages += s.images.length);
         let processedImages = 0;
 
-        // Add HTML
+        // Add HTML - fetch actual index.html and modify for offline use
         updateExportProgress(5, 'Creating viewer files...');
-        zip.file('index.html', generateExportHTML(patientMeta));
+        const htmlResponse = await fetch('index.html');
+        let htmlContent = await htmlResponse.text();
+
+        // Modify HTML for offline/export use:
+        // 1. Remove external CDN scripts (JSZip) - not needed for viewing
+        htmlContent = htmlContent.replace(/<script src="https:\/\/cdnjs\.cloudflare\.com[^"]*"><\/script>/g, '');
+        // 2. Remove project-related UI scripts (patientUI, projectUI, importUI)
+        htmlContent = htmlContent.replace(/<script src="js\/patientUI\.js"><\/script>/g, '');
+        htmlContent = htmlContent.replace(/<script src="js\/projectUI\.js"><\/script>/g, '');
+        htmlContent = htmlContent.replace(/<script src="js\/importUI\.js"><\/script>/g, '');
+        // 3. Remove export.js (not needed for viewing)
+        htmlContent = htmlContent.replace(/<script src="js\/export\.js"><\/script>/g, '');
+        // 4. Add data.js script before app.js
+        htmlContent = htmlContent.replace(
+            '<script src="js/app.js"></script>',
+            '<script src="js/data.js"></script>\n    <script src="js/app.js"></script>'
+        );
+        // 5. Remove Google Fonts link for offline compatibility
+        htmlContent = htmlContent.replace(/<link rel="preconnect"[^>]*>/g, '');
+        htmlContent = htmlContent.replace(/<link href="https:\/\/fonts\.googleapis\.com[^"]*"[^>]*>/g, '');
+        // 6. Add offline font fallback style
+        htmlContent = htmlContent.replace(
+            '</head>',
+            '    <style>body { font-family: Arial, Helvetica, sans-serif; }</style>\n</head>'
+        );
+
+        zip.file('index.html', htmlContent);
 
         // Add CSS (fetch from current page)
         const cssResponse = await fetch('css/style.css');
         const cssContent = await cssResponse.text();
         zip.folder('css').file('style.css', cssContent);
 
-        // Add viewer JS
-        zip.folder('js').file('viewer.js', generateViewerJS());
+        // Add app.js - fetch and modify for offline use
+        const appJsResponse = await fetch('js/app.js');
+        let appJsContent = await appJsResponse.text();
 
-        // Create filtered data.js
+        // Modify app.js for export mode:
+        // 1. Add code at the start to load from MRI_DATA instead of server
+        const exportModePrefix = `
+// EXPORT MODE - Load data from embedded MRI_DATA
+window.EXPORT_MODE = true;
+window.appData = typeof MRI_DATA !== 'undefined' ? MRI_DATA : null;
+`;
+        appJsContent = exportModePrefix + appJsContent;
+
+        zip.folder('js').file('app.js', appJsContent);
+
+        // Create filtered data.js with series info (images array references local paths)
+        const exportSeries = selectedSeries.map(s => ({
+            ...s,
+            // Override imagePath for local export structure
+            imagePath: null,
+            projectId: null
+        }));
         const exportData = {
-            series: selectedSeries
+            series: exportSeries
         };
         zip.folder('js').file('data.js', 'const MRI_DATA = ' + JSON.stringify(exportData, null, 2) + ';');
 
@@ -468,7 +512,13 @@ async function exportSelectedSeries(selectedSeries, patientMeta) {
 
             for (let i = 0; i < series.images.length; i++) {
                 const imageName = series.images[i];
-                const imagePath = `img/${series.id}/${imageName}`;
+                // Use project-based path if available, fallback to legacy path
+                let imagePath;
+                if (series.imagePath && series.projectId) {
+                    imagePath = `/projects/${series.projectId}/${series.imagePath}/${imageName}`;
+                } else {
+                    imagePath = `img/${series.id}/${imageName}`;
+                }
                 try {
                     const blob = await fetchImageAsBlob(imagePath);
 
